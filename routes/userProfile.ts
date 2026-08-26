@@ -21,6 +21,63 @@ function favicon () {
   return utils.extractFilename(config.get('application.favicon'))
 }
 
+function safeEval (code: string): any {
+  if (typeof code !== 'string') {
+    throw new Error('Code must be a string')
+  }
+  const trimmed = code.trim()
+  if (trimmed.length > 500) {
+    throw new Error('Code is too long')
+  }
+
+  // 1. Single quotes: 'string'
+  if (/^'([^'\\]|\\.)*'$/.test(trimmed)) {
+    return trimmed.slice(1, -1).replace(/\\(.)/g, (match, char) => {
+      if (char === 'n') return '\n'
+      if (char === 't') return '\t'
+      if (char === 'r') return '\r'
+      return char
+    })
+  }
+
+  // 2. Double quotes: "string"
+  if (/^"([^"\\]|\\.)*"$/.test(trimmed)) {
+    return trimmed.slice(1, -1).replace(/\\(.)/g, (match, char) => {
+      if (char === 'n') return '\n'
+      if (char === 't') return '\t'
+      if (char === 'r') return '\r'
+      return char
+    })
+  }
+
+  // 3. Backticks: `string` (excluding template interpolation)
+  if (/^`([^`\\]|\\.)*`$/.test(trimmed) && !trimmed.includes('${')) {
+    return trimmed.slice(1, -1).replace(/\\(.)/g, (match, char) => {
+      if (char === 'n') return '\n'
+      if (char === 't') return '\t'
+      if (char === 'r') return '\r'
+      return char
+    })
+  }
+
+  // 4. Numeric literal
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    return Number(trimmed)
+  }
+
+  // 5. Booleans and null
+  if (trimmed === 'true') return true
+  if (trimmed === 'false') return false
+  if (trimmed === 'null') return null
+
+  // 6. Mathematical expressions (strictly digits, operators, parentheses, decimals, spaces)
+  if (/^[0-9+\-*/().\s]+$/.test(trimmed)) {
+    return new Function(`return (${trimmed})`)() // eslint-disable-line no-new-func
+  }
+
+  throw new Error('Unsafe code execution blocked')
+}
+
 export function getUserProfile () {
   return async (req: Request, res: Response, next: NextFunction) => {
     let template: string
@@ -58,7 +115,7 @@ export function getUserProfile () {
         if (!code) {
           throw new Error('Username is null')
         }
-        username = eval(code) // eslint-disable-line no-eval
+        username = safeEval(code)
       } catch (err) {
         username = '\\' + username
       }

@@ -49,6 +49,8 @@ def extract_findings(raw: str) -> list[dict]:
             data = json.loads(c)
         except json.JSONDecodeError:
             continue
+        if data is None:
+            return []
         if isinstance(data, list):
             return [x for x in data if isinstance(x, dict)]
         if isinstance(data, dict):

@@ -81,10 +81,21 @@ jobs:
           cm report -f json > "$RUNNER_TEMP/wif-smoke-report.json"
           python3 - "$RUNNER_TEMP/wif-smoke-report.json" <<'EOF'
           import json, sys
-          findings = json.load(open(sys.argv[1]))
-          findings = findings if isinstance(findings, list) else findings.get("Findings", [])
+          data = json.load(open(sys.argv[1]))
+          if data is None:
+              findings = []
+          elif isinstance(data, list):
+              findings = [f for f in data if isinstance(f, dict)]
+          elif isinstance(data, dict):
+              findings = data.get("Findings")
+              if findings is None:
+                  findings = data.get("findings", [])
+              findings = findings if isinstance(findings, list) else []
+              findings = [f for f in findings if isinstance(f, dict)]
+          else:
+              findings = []
           print(f"WIF smoke scan complete: {len(findings)} finding(s)")
           for f in findings:
-              print(f"  - [{f.get('Severity')}] {f.get('Title')}")
+              print(f"  - [{f.get('Severity') or f.get('severity')}] {f.get('Title') or f.get('title')}")
           EOF
           echo "✅ CodeMender authenticated and scanned via WIF — no key involved."
